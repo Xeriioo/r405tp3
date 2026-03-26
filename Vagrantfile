@@ -2,18 +2,16 @@
 # # vi: set ft=ruby :
 
 $subnet = "192.168.57"
-$num_dns = 1 #max 9
-$num_web = 1 #max 9
+$num_dns = 9 #max 9
+$num_web = 9 #max 9
 
 Vagrant.configure("2") do |config|
 
   config.vm.box = "generic/debian11"
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.cpus = 1
-    vb.memory = 512
-    vb.customize ["modifyvm", :id, "--vram", "8"] # ubuntu defaults to 256 MB which is a waste of precious RAM
-    vb.linked_clone = true
+  config.vm.provider "libvirt" do |libvirt|
+    libvirt.cpus = 1
+    libvirt.memory = 512
   end
 
   if Vagrant.has_plugin?("vagrant-vbguest")

@@ -1,0 +1,117 @@
+- name: Install Bind
+  hosts: dns
+  become: true
+
+  tasks:
+    - name: Update apt
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install bind9
+      ansible.builtin.package:
+        name: bind9
+        state: present
+
+    - name: "Génération du numéro de série (Unix Timestamp)"
+      shell: "date +%s"
+      register: timestamp
+      run_once: true
+
+    - name: Generate template
+      ansible.builtin.template:
+        src: templates/labzone.j2
+        dest: /etc/bind/db.{{ domaine_lab }}
+        owner: bind
+        group: bind
+        mode: '0644'
+
+    - name: Declare zone in named.conf.local
+      ansible.builtin.blockinfile:
+        path: /etc/bind/named.conf.local
+        block: |
+          zone "{{ domaine_lab }}" {
+              type master;
+              file "/etc/bind/db.{{ domaine_lab }}";
+          };
+
+    - name: Reload bind9 service
+      ansible.builtin.service:
+        name: bind9
+        state: reloaded
+
+- name: Change dns
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Task change dns
+      ansible.builtin.import_tasks:
+        file: tasks/set_dns.yml
+
+- name: Setup Load Balancer
+  hosts: lb
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install apache2
+      ansible.builtin.package:
+        name: apache2
+        state: present
+
+    - name: Enable Apache modules
+      community.general.apache2_module:
+        state: present
+        name: "{{ item }}"
+      loop:
+        - proxy_http
+        - proxy_http2
+        - proxy_balancer
+        - lbmethod_byrequests
+
+    - name: Generate LB config
+      ansible.builtin.template:
+        src: templates/lb-apache-conf.j2
+        dest: /etc/apache2/sites-available/000-default.conf
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      notify: Reload apache2
+
+  handlers:
+    - name: Reload apache2
+      ansible.builtin.service:
+        name: apache2
+        state: reloaded
+
+- name: Setup Web Servers
+  hosts: web
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install apache2 and php
+      ansible.builtin.package:
+        name:
+          - apache2
+          - php
+        state: present
+
+    - name: Remove default index.html
+      ansible.builtin.file:
+        path: /var/www/html/index.html
+        state: absent
+
+    - name: Copy index.php
+      ansible.builtin.copy:
+        src: files/index.php
+        dest: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        mode: '0644'

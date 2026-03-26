@@ -1,0 +1,16 @@
+$TTL    604800
+@       IN      SOA     {{ groups['dns'] | first }}.{{ domaine_lab }}. admin.{{ domaine_lab }}. (
+                              {{ timestamp.stdout }} ; Serial (Unix Timestamp)
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+
+{% for hote in groups['dns'] %}
+@               IN      NS      {{ hote }}.{{ domaine_lab }}.
+{% endfor %}
+
+{% for hote in groups['all'] %}
+{{ hote }}  IN      A       {{ hostvars[hote]['ansible_host'] }}
+{% endfor %}
